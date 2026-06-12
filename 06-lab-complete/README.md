@@ -1,100 +1,146 @@
-# Lab 12 — Complete Production Agent
+# Lab 12 Complete Production Agent
 
-Kết hợp TẤT CẢ những gì đã học trong 1 project hoàn chỉnh.
+This project combines all Day 12 deployment requirements into one production-ready FastAPI agent.
 
-## Checklist Deliverable
+## Features
 
-- [x] Dockerfile (multi-stage, < 500 MB)
-- [x] docker-compose.yml (agent + redis)
-- [x] .dockerignore
-- [x] Health check endpoint (`GET /health`)
-- [x] Readiness endpoint (`GET /ready`)
-- [x] API Key authentication
-- [x] Rate limiting
-- [x] Cost guard
-- [x] Config từ environment variables
-- [x] Structured logging
-- [x] Graceful shutdown
-- [x] Public URL ready (Railway / Render config)
+- REST API: `POST /ask`
+- Optional streaming: `POST /ask/stream`
+- Conversation history in Redis
+- API key authentication
+- Optional JWT authentication
+- Redis sliding-window rate limiting, default `10 req/min/user`
+- Redis monthly cost guard, default `$10/month/user`
+- `/health` liveness and `/ready` readiness checks
+- Structured JSON logging
+- Graceful shutdown through FastAPI lifespan and Uvicorn
+- Multi-stage Dockerfile, non-root runtime user
+- Docker Compose stack with agent, Redis, and Nginx load balancer
+- Railway and Render deployment config
 
----
+## Structure
 
-## Cấu Trúc
-
-```
+```text
 06-lab-complete/
 ├── app/
-│   ├── main.py         # Entry point — kết hợp tất cả
-│   ├── config.py       # 12-factor config
-│   ├── auth.py         # API Key + JWT
-│   ├── rate_limiter.py # Rate limiting
-│   └── cost_guard.py   # Budget protection
-├── Dockerfile          # Multi-stage, production-ready
-├── docker-compose.yml  # Full stack
-├── railway.toml        # Deploy Railway
-├── render.yaml         # Deploy Render
-├── .env.example        # Template
+│   ├── main.py
+│   ├── config.py
+│   ├── auth.py
+│   ├── rate_limiter.py
+│   ├── cost_guard.py
+│   └── redis_client.py
+├── utils/
+│   └── mock_llm.py
+├── Dockerfile
+├── docker-compose.yml
+├── nginx.conf
+├── railway.toml
+├── render.yaml
+├── .env.example
 ├── .dockerignore
 └── requirements.txt
 ```
 
----
+## Run Locally With Docker
 
-## Chạy Local
+Docker Desktop must be installed and running.
 
 ```bash
-# 1. Setup
-cp .env.example .env
+cd 06-lab-complete
+docker compose up --build
+```
 
-# 2. Chạy với Docker Compose
-docker compose up
+Scale to three agent replicas:
 
-# 3. Test
+```bash
+docker compose up --build --scale agent=3
+```
+
+## Test
+
+```bash
 curl http://localhost/health
-
-# 4. Lấy API key từ .env, test endpoint
-API_KEY=$(grep AGENT_API_KEY .env | cut -d= -f2)
-curl -H "X-API-Key: $API_KEY" \
-     -X POST http://localhost/ask \
-     -H "Content-Type: application/json" \
-     -d '{"question": "What is deployment?"}'
+curl http://localhost/ready
 ```
 
----
-
-## Deploy Railway (< 5 phút)
+Authenticated request:
 
 ```bash
-# Cài Railway CLI
-npm i -g @railway/cli
-
-# Login và deploy
-railway login
-railway init
-railway variables set OPENAI_API_KEY=sk-...
-railway variables set AGENT_API_KEY=your-secret-key
-railway up
-
-# Nhận public URL!
-railway domain
+curl -X POST http://localhost/ask \
+  -H "X-API-Key: dev-key-change-me" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"test","question":"What is Docker?"}'
 ```
 
----
+Conversation history:
 
-## Deploy Render
+```bash
+curl -X POST http://localhost/ask \
+  -H "X-API-Key: dev-key-change-me" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"alice","question":"My name is Alice"}'
 
-1. Push repo lên GitHub
-2. Render Dashboard → New → Blueprint
-3. Connect repo → Render đọc `render.yaml`
-4. Set secrets: `OPENAI_API_KEY`, `AGENT_API_KEY`
-5. Deploy → Nhận URL!
+curl -X POST http://localhost/ask \
+  -H "X-API-Key: dev-key-change-me" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"alice","question":"What is my name?"}'
+```
 
----
+Rate limit:
 
-## Kiểm Tra Production Readiness
+```bash
+for i in {1..15}; do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost/ask \
+    -H "X-API-Key: dev-key-change-me" \
+    -H "Content-Type: application/json" \
+    -d "{\"user_id\":\"rate-test\",\"question\":\"test $i\"}"
+done
+```
+
+## Run Without Docker For Syntax/Smoke Checks
+
+This starts the app, but `/ready` and authenticated `/ask` require Redis.
+
+```bash
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+## Production Readiness Check
 
 ```bash
 python check_production_ready.py
 ```
 
-Script này kiểm tra tất cả items trong checklist và báo cáo những gì còn thiếu.
+On Windows consoles that cannot print emoji:
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+python check_production_ready.py
+```
+
+## Deploy
+
+Railway:
+
+```bash
+railway login
+railway init
+railway add redis
+railway variables set ENVIRONMENT=production
+railway variables set AGENT_API_KEY=<strong-secret>
+railway variables set JWT_SECRET=<strong-secret>
+railway variables set RATE_LIMIT_PER_MINUTE=10
+railway variables set MONTHLY_BUDGET_USD=10.0
+railway up
+railway domain
+```
+
+Render:
+
+1. Push the repository to GitHub.
+2. Create a new Blueprint on Render.
+3. Select this repo and the `06-lab-complete/render.yaml` blueprint.
+4. Confirm generated secrets and Redis connection.
+5. Deploy and test `/health`, `/ready`, and `/ask`.
