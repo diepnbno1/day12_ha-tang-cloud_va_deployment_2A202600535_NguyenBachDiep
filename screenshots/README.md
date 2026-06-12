@@ -1,14 +1,12 @@
 # Screenshots
 
-Add these files after deploying with your Railway or Render account:
+Included deployment evidence:
 
 ```text
-dashboard.png
-running.png
-test.png
+render.PNG
 ```
 
-Suggested captures:
+Suggested additional captures:
 
 1. Cloud dashboard showing the service is deployed.
 2. Service logs or status page showing it is running.
