@@ -2,18 +2,18 @@
 
 ## Public URL
 
-`PENDING_USER_DEPLOYMENT`
+`https://ai-agent-production-ga3j.onrender.com`
 
-This cannot be completed from the local repo alone because Railway/Render login, billing/free-tier confirmation, domain creation, and dashboard screenshots require the owner's account.
+Deployed successfully on Render from commit `8e6af2a`.
 
 ## Platform
 
-Prepared for Railway or Render.
+Render Blueprint.
 
-Recommended final project directory:
+Blueprint:
 
 ```bash
-cd 06-lab-complete
+day12-agent-deployment
 ```
 
 ## Environment Variables
@@ -47,22 +47,22 @@ railway up
 railway domain
 ```
 
-## Render Steps
+## Render Deployment
 
-1. Push this repository to GitHub.
-2. Open Render Dashboard.
-3. New -> Blueprint.
-4. Select this repo.
-5. Use `06-lab-complete/render.yaml`.
-6. Confirm generated secrets and Redis connection.
-7. Deploy.
+1. Repository: `diepnbno1/day12_ha-tang-cloud_va_deployment`
+2. Branch: `main`
+3. Blueprint file: `render.yaml`
+4. Services created:
+   - `ai-agent-production` web service
+   - `ai-agent-redis` key value store
+5. Deploy status: live
 
 ## Test Commands
 
 Replace `BASE_URL` and `API_KEY` after deployment.
 
 ```bash
-BASE_URL=https://your-agent.example.com
+BASE_URL=https://ai-agent-production-ga3j.onrender.com
 API_KEY=<your-agent-api-key>
 ```
 
@@ -106,6 +106,27 @@ curl -X POST "$BASE_URL/ask" \
 ```
 
 Expected: `200 OK` with an `answer`.
+
+## Cloud Verification
+
+```text
+GET /health -> 200 OK
+GET /ready -> 200 OK
+GET /metrics without API key -> 401 Unauthorized
+POST /ask without API key -> 401 Unauthorized
+```
+
+Health response:
+
+```json
+{"status":"ok","version":"1.0.0","environment":"production"}
+```
+
+Readiness response:
+
+```json
+{"ready":true,"storage":"redis"}
+```
 
 ### Conversation History Test
 
@@ -158,7 +179,7 @@ Rate limit test -> first 10 requests 200, following requests 429
 
 ## Screenshots
 
-Add screenshots after deployment:
+Screenshots can be added from the Render dashboard:
 
 ```text
 screenshots/dashboard.png
